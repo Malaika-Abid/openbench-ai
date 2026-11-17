@@ -237,6 +237,9 @@ def test_analyze_and_rank_html_are_self_contained_and_escaped(tmp_path, capsys):
 
 
 def test_markdown_reports_link_to_the_documentation(tmp_path, capsys):
+    import threading
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
     a, b = _files(tmp_path, name_b="model-b")
     inputs = ["--results", str(a), str(b), "--resamples", "300", "--permutations", "999"]
     for command in (
@@ -245,9 +248,57 @@ def test_markdown_reports_link_to_the_documentation(tmp_path, capsys):
         ["plan", "--items", "200", "--baseline-accuracy", "0.7"],
     ):
         assert main([*command, "--format", "markdown"]) == 0
-        footer = capsys.readouterr().out.strip().splitlines()[-1]
+        lines = capsys.readouterr().out.rstrip().splitlines()
+        footer = lines[-1]
         assert "[Reading guide](https://lakshaychhaba0001-sys.github.io/openbench-ai/reading_a_report/)" in footer
         assert "[Glossary](https://lakshaychhaba0001-sys.github.io/openbench-ai/glossary/)" in footer
+
+    prefs_dir = tmp_path / "prefs"
+    assert main(["preferences", "create", "--results", str(a), str(b), "--output", str(prefs_dir)]) == 0
+    key = json.loads((prefs_dir / "tasks.key.json").read_text(encoding="utf-8"))
+    ann = tmp_path / "ann.jsonl"
+    ann.write_text(
+        "\n".join(
+            json.dumps({"annotation_id": f"h{n}", "task_id": t["task_id"], "annotator_id": "h1", "outcome": "response_1"})
+            for n, t in enumerate(key["tasks"])
+        ) + "\n",
+        encoding="utf-8",
+    )
+    capsys.readouterr()
+
+    class _Handler(BaseHTTPRequestHandler):
+        def do_POST(self):
+            self.rfile.read(int(self.headers.get("Content-Length", "0")))
+            body = json.dumps({"choices": [{"message": {"content": "1"}}]}).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *args):
+            pass
+
+    ds = ROOT / "datasets/reasoning/sample.jsonl"
+    server = ThreadingHTTPServer(("127.0.0.1", 0), _Handler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        commands = [
+            (["preferences", "analyze", "--key", str(prefs_dir / "tasks.key.json"), "--annotations", str(ann), "--resamples", "200"], "human_preferences"),
+            (["judge", "--results", str(a), str(b), "--judge-provider", "openai_compatible",
+              "--judge-endpoint", f"http://127.0.0.1:{server.server_port}/v1", "--judge-model", "judge-z",
+              "--cache-dir", str(tmp_path / "cache"), "--resamples", "200"], "llm_judge"),
+            (["audit-contamination", str(ds), "--corpus", str(ds), "--ngram", "6", "--min-words", "4"], "benchmark_tools"),
+        ]
+        for command, page_slug in commands:
+            assert main([*command, "--format", "markdown"]) == 0
+            lines = capsys.readouterr().out.rstrip().splitlines()
+            assert lines[-2] == ""
+            footer = lines[-1]
+            assert f"https://lakshaychhaba0001-sys.github.io/openbench-ai/{page_slug}/" in footer
+            assert "[Reading guide](https://lakshaychhaba0001-sys.github.io/openbench-ai/reading_a_report/)" in footer
+            assert "[Glossary](https://lakshaychhaba0001-sys.github.io/openbench-ai/glossary/)" in footer
+    finally:
+        server.shutdown()
 
 
 # ---------------------------------------------------------------------------------------------

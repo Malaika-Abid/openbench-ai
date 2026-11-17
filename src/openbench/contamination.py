@@ -209,7 +209,7 @@ def audit_contamination(
 
 
 def render_contamination(payload: dict[str, Any], fmt_name: str) -> str:
-    from openbench.reporting_v040 import _csv, _table, fmt, to_json
+    from openbench.reporting_v040 import _csv, _table, fmt, report_doc_markdown, to_json
 
     if fmt_name == "json":
         return to_json(payload)
@@ -235,4 +235,5 @@ def render_contamination(payload: dict[str, Any], fmt_name: str) -> str:
     ]
     shown = [row for row in rows if row[-1] == "yes"] or rows[:20]
     lines += _table(["ID", "Category", "Prompt overlap", "Longest span (words)", "Answer overlap", "Longest span (words)", "Flagged"], shown)
+    lines += ["", report_doc_markdown("contamination")]
     return "\n".join(lines) + "\n"

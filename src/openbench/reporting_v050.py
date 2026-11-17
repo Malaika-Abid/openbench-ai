@@ -18,6 +18,7 @@ from openbench.reporting_v040 import (
     fmt,
     fmt_ci,
     fmt_p,
+    report_doc_markdown,
     to_json,
 )
 
@@ -141,6 +142,7 @@ def render_judge(payload: dict[str, Any], fmt_name: str) -> str:
     if payload.get("warnings"):
         lines += ["## Warnings", ""] + [f"- `{w['code']}`: {w['message']}" for w in payload["warnings"]] + [""]
     lines += ["## Method", "", payload["methodology"], ""]
+    lines.append(report_doc_markdown("judge"))
     return "\n".join(lines) + "\n"
 
 

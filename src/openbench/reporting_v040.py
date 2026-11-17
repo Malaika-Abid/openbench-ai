@@ -23,11 +23,25 @@ from openbench.reporting import escape_markdown_cell
 from openbench.security import csv_safe
 
 MD_DISPLAY_LIMIT = 50
+DOCS_BASE_URL = "https://lakshaychhaba0001-sys.github.io/openbench-ai"
 REPORT_DOC_LINKS = (
-    ("Reading guide", "https://lakshaychhaba0001-sys.github.io/openbench-ai/reading_a_report/"),
-    ("Glossary", "https://lakshaychhaba0001-sys.github.io/openbench-ai/glossary/"),
+    ("Reading guide", f"{DOCS_BASE_URL}/reading_a_report/"),
+    ("Glossary", f"{DOCS_BASE_URL}/glossary/"),
 )
 REPORT_DOC_MARKDOWN = " · ".join(f"[{label}]({url})" for label, url in REPORT_DOC_LINKS)
+REPORT_PAGE_DOC_LINKS = {
+    "preferences": ("Human preferences guide", f"{DOCS_BASE_URL}/human_preferences/"),
+    "judge": ("LLM-as-a-judge guide", f"{DOCS_BASE_URL}/llm_judge/"),
+    "contamination": ("Benchmark tools guide", f"{DOCS_BASE_URL}/benchmark_tools/"),
+}
+
+
+def report_doc_markdown(page: str | None = None) -> str:
+    """Return the shared documentation footer line, optionally with a report-specific guide."""
+    if page and page in REPORT_PAGE_DOC_LINKS:
+        label, url = REPORT_PAGE_DOC_LINKS[page]
+        return f"[{label}]({url}) · {REPORT_DOC_MARKDOWN}"
+    return REPORT_DOC_MARKDOWN
 
 
 def to_json(payload: dict[str, Any]) -> str:
@@ -374,6 +388,7 @@ def render_preferences(payload: dict[str, Any], fmt_name: str) -> str:
         lines += [""] + render_agreement_md(p["metric_agreement"])
     lines += ["", "## Methodology", ""] + [f"- {k.replace('_', ' ')}: {v}" for k, v in p["methodology"].items()]
     lines += [""] + _provenance_md(p.get("provenance"))
+    lines += ["", report_doc_markdown("preferences")]
     return "\n".join(lines).rstrip() + "\n"
 
 
